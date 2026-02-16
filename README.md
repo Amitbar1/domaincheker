@@ -1,36 +1,99 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Domain Strategy Dashboard
 
-## Getting Started
+AI-powered domain name generator for multi-brand trading companies. Uses Google Gemini to create brandable domain names, checks availability, filters by budget, and links directly to MainReg for purchase.
 
-First, run the development server:
+## Quick Start
+
+### Prerequisites
+
+- Node.js 18+
+- A Google Gemini API key ([get one here](https://aistudio.google.com/app/apikey))
+
+### Setup
 
 ```bash
+# Install dependencies
+npm install
+
+# Create your environment file
+cp .env.local.example .env.local
+
+# Add your Gemini API key to .env.local
+# GEMINI_API_KEY=your_key_here
+
+# Start the development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | Required | Description |
+|---|---|---|
+| `GEMINI_API_KEY` | Yes | Google Gemini API key for domain name generation |
+| `MAINREG_API_KEY` | No | MainReg API key for real availability checks |
+| `MAINREG_API_SECRET` | No | MainReg API secret |
+| `WHOAPI_KEY` | No | WhoAPI key (fallback domain checker) |
 
-## Learn More
+When no domain checker API keys are configured, the app uses a mock checker that simulates availability and pricing.
 
-To learn more about Next.js, take a look at the following resources:
+## Architecture
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/
+├── app/
+│   ├── layout.tsx              # Root layout (dark theme)
+│   ├── page.tsx                # Dashboard (client component)
+│   ├── globals.css             # Tailwind + custom dark theme
+│   └── api/generate/route.ts   # POST endpoint
+├── lib/
+│   ├── gemini.ts               # Gemini name generation service
+│   └── domain.ts               # Domain availability checker (modular)
+└── components/
+    ├── SearchForm.tsx           # Input form
+    ├── ResultsTable.tsx         # Results table with filtering
+    ├── StatusBadge.tsx          # Available/Taken badge
+    └── BuyButton.tsx            # MainReg deep-link button
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Data Flow
 
-## Deploy on Vercel
+1. User fills in target audience, keywords, TLD, language, and budget
+2. Client POSTs to `/api/generate`
+3. Server calls Gemini 1.5 Flash to generate 20 domain names
+4. Server checks each domain via the configured `DomainService` checker
+5. Client receives results and filters by budget
+6. "Buy Now" opens MainReg with the domain pre-filled
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Domain Checker Strategy
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The `DomainService` class uses a strategy pattern to select the checker:
+
+- **`MockDomainChecker`** (default) - deterministic simulation for development
+- **`MainRegChecker`** (stub) - activated when `MAINREG_API_KEY` is set
+- **`WhoAPIChecker`** (stub) - activated when `WHOAPI_KEY` is set
+
+To integrate a real checker, implement the `IDomainChecker` interface:
+
+```typescript
+interface IDomainChecker {
+  check(domain: string): Promise<{
+    domain: string;
+    available: boolean;
+    price: number;
+    currency: string;
+  }>;
+}
+```
+
+## Tech Stack
+
+- **Next.js 16** (App Router)
+- **Tailwind CSS v4**
+- **TypeScript**
+- **@google/generative-ai** (Gemini 1.5 Flash)
+
+## Supported Languages
+
+English, French, German, Spanish, Arabic, Portuguese, Italian, Dutch, Japanese. Each language adjusts the Gemini prompt to generate culturally relevant brand names.
